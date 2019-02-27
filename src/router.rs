@@ -209,7 +209,6 @@ pub fn recognize<'a>(
     }
 
     let mut buf: Vec<char> = path.clone();
-    let mut next: Vec<char>;
     let mut values: Option<Vec<Vec<char>>> = None;
 
     match node.path[0] {
@@ -226,7 +225,7 @@ pub fn recognize<'a>(
         }
         ':' => {
             let mut i = 0;
-            next = buf.split_off(loop {
+            let next = buf.split_off(loop {
                 if i == buf.len() {
                     break i;
                 }
@@ -287,7 +286,7 @@ pub fn recognize<'a>(
                 return None;
             }
 
-            next = buf.split_off(m);
+            buf = buf.split_off(m);
 
             o = 0;
             let mut has_star = false;
@@ -306,7 +305,7 @@ pub fn recognize<'a>(
             }
 
             m = 0;
-            let c = next[m];
+            let c = buf[m];
             let mut has_node = false;
             while m < l {
                 if c == node.indices[m] {
@@ -318,7 +317,7 @@ pub fn recognize<'a>(
 
             // Static Node
             if has_node {
-                if let Some((n, v)) = recognize(&next, &node.nodes[m]) {
+                if let Some((n, v)) = recognize(&buf, &node.nodes[m]) {
                     if let Some(mut d) = v {
                         match values.as_mut() {
                             Some(v) => {
@@ -335,7 +334,7 @@ pub fn recognize<'a>(
 
             // Parameter
             if has_colon {
-                if let Some((n, v)) = recognize(&next, &node.nodes[n]) {
+                if let Some((n, v)) = recognize(&buf, &node.nodes[n]) {
                     if let Some(mut d) = v {
                         match values.as_mut() {
                             Some(v) => {
@@ -352,7 +351,7 @@ pub fn recognize<'a>(
 
             // CatchAll
             if has_star {
-                if let Some((n, v)) = recognize(&next, &node.nodes[o]) {
+                if let Some((n, v)) = recognize(&buf, &node.nodes[o]) {
                     if let Some(mut d) = v {
                         match values.as_mut() {
                             Some(v) => {
@@ -367,7 +366,7 @@ pub fn recognize<'a>(
                 }
             }
 
-            // dbg!(buf = next);
+            // dbg!(buf);
         }
     }
 
