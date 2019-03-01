@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::iter::FromIterator;
 
 use radix_tree::Node;
@@ -59,8 +60,8 @@ impl Router {
 
         // Root "/"
         if 0 == buf.len() {
-            match &mut node.data {
-                Some(ref mut d) => {
+            match node.data.as_mut() {
+                Some(d) => {
                     d.is_key = true;
                 }
                 None => {
@@ -145,7 +146,7 @@ impl Router {
             let ended = 0 == next.len();
 
             // end
-            if 0 == next.len() {
+            if ended {
                 if let Some(ref p) = params {
                     meta.params = Some(
                         p.iter()
@@ -158,6 +159,7 @@ impl Router {
                 meta.is_key = true;
             }
 
+            // Add ':' '*' to last
             node = node.add_node_with(&mut buf, Some(meta), 0, ended, |&l, &c, indices| {
                 let mut j = l;
                 if 0 == j {
@@ -176,7 +178,7 @@ impl Router {
                     return j;
                 }
 
-                if ':' == indices[j - 1] {
+                if 0 < j && ':' == indices[j - 1] {
                     j -= 1;
                 }
 
@@ -189,14 +191,51 @@ impl Router {
         self
     }
 
-    pub fn find(
+    pub fn find_with(
         &mut self,
         path: &'static str,
     ) -> Option<(&Node<char, NodeMetadata>, Option<Vec<Vec<char>>>)> {
-        let node = &self.tree;
-        let buf: &Vec<char> = &path.chars().collect();
+        recognize(&path.chars().collect(), &self.tree)
+    }
 
-        recognize(&buf, &node)
+    pub fn find(
+        &mut self,
+        path: &'static str,
+    ) -> Option<(
+        &Node<char, NodeMetadata>,
+        Option<Vec<(&'static str, &'static str)>>,
+    )> {
+        let mut params: Option<Vec<(&'static str, &'static str)>> = None;
+
+        // Too many if and deep
+        if let Some((node, values)) = &self.find_with(path) {
+            if let Some(data) = &node.data {
+                if !data.is_key {
+                    return None;
+                }
+
+                if let Some(ps) = &data.params {
+                    if let Some(vs) = &values {
+                        params = Some(
+                            vs.iter()
+                                .enumerate()
+                                .map(|(i, v)| {
+                                    (
+                                        &*ps[i],
+                                        &*(Box::leak(
+                                            String::from_iter(v.into_iter()).into_boxed_str(),
+                                        )),
+                                    )
+                                })
+                                .collect(),
+                        );
+                    }
+                }
+            }
+            return Some((node, params));
+        }
+
+        None
     }
 }
 
@@ -204,7 +243,7 @@ pub fn recognize<'a>(
     path: &Vec<char>,
     node: &'a Node<char, NodeMetadata>,
 ) -> Option<(&'a Node<char, NodeMetadata>, Option<Vec<Vec<char>>>)> {
-    if path.len() == 0 {
+    if 0 == path.len() {
         return None;
     }
 
@@ -328,11 +367,27 @@ pub fn recognize<'a>(
                             }
                         }
                     }
+
+                    // '/'
+                    if '/' == n.path[n.path.len() - 1] {
+                        if let Some(data) = &n.data {
+                            if data.is_key {
+                                // '/' is key node, ended
+                                return Some((&n, values));
+                            } else if 0 < n.indices.len() && '*' == n.indices[n.indices.len() - 1] {
+                                // CatchAll '*'
+                                return Some((&n.nodes[n.indices.len() - 1], values));
+                            } else {
+                                return None;
+                            }
+                        }
+                    }
+
                     return Some((&n, values));
                 }
             }
 
-            // Parameter
+            // Parameter ':'
             if has_colon {
                 if let Some((n, v)) = recognize(&buf, &node.nodes[n]) {
                     if let Some(mut d) = v {
@@ -349,7 +404,7 @@ pub fn recognize<'a>(
                 }
             }
 
-            // CatchAll
+            // CatchAll '*'
             if has_star {
                 if let Some((n, v)) = recognize(&buf, &node.nodes[o]) {
                     if let Some(mut d) = v {
@@ -404,7 +459,7 @@ mod tests {
         router.insert("/about/us", NodeMetadata::new());
         router.insert("/users/repos/*any", NodeMetadata::new());
 
-        println!("{:#?}", router);
+        // println!("{:#?}", router);
 
         let route = router.find("/");
         // println!("/ {:#?}", route);
@@ -446,52 +501,37 @@ mod tests {
         assert_eq!(route.is_some(), true);
         let res = route.unwrap();
         assert_eq!(res.0.path, [':']);
-        assert_eq!(res.1.unwrap(), [['u', 's', 'e', 'r', 'n', 'a', 'm', 'e']]);
+        assert_eq!(res.1.unwrap(), [("username", "username")]);
 
         let route = router.find("/user/s");
         // println!("/user/s {:#?}", route);
         let res = route.unwrap();
         assert_eq!(res.0.path, ['*']);
-        assert_eq!(res.1.unwrap(), [['u', 's', 'e', 'r', '/', 's']]);
+        assert_eq!(res.1.unwrap(), [("any", "user/s")]);
 
         let route = router.find("/users/fundon/repo");
         // println!("/users/fundon/repo {:#?}", route);
         let res = route.unwrap();
         assert_eq!(res.0.path, [':']);
-        assert_eq!(
-            res.1.unwrap(),
-            vec![vec!['f', 'u', 'n', 'd', 'o', 'n'], vec!['r', 'e', 'p', 'o']]
-        );
+        assert_eq!(res.1.unwrap(), [("id", "fundon"), ("org", "repo")]);
 
         let route = router.find("/users/fundon/repos");
         // println!("/users/fundon/repos {:#?}", route);
         let res = route.unwrap();
         assert_eq!(res.0.path, "repos".chars().collect::<Vec<char>>());
-        assert_eq!(res.1.unwrap(), [['f', 'u', 'n', 'd', 'o', 'n']]);
+        assert_eq!(res.1.unwrap(), [("user_id", "fundon")]);
 
         let route = router.find("/users/fundon/repos/trek-rs");
         // println!("/users/fundon/repos/233 {:#?}", route);
         let res = route.unwrap();
         assert_eq!(res.0.path, [':']);
-        assert_eq!(
-            res.1.unwrap(),
-            vec![
-                vec!['f', 'u', 'n', 'd', 'o', 'n'],
-                vec!['t', 'r', 'e', 'k', '-', 'r', 's'],
-            ]
-        );
+        assert_eq!(res.1.unwrap(), [("user_id", "fundon"), ("id", "trek-rs"),]);
 
         let route = router.find("/users/fundon/repos/trek-rs/");
         // println!("/users/fundon/repos/233/ {:#?}", route);
         let res = route.unwrap();
-        assert_eq!(res.0.path, ['/']);
-        assert_eq!(
-            res.1.unwrap(),
-            vec![
-                vec!['f', 'u', 'n', 'd', 'o', 'n'],
-                vec!['t', 'r', 'e', 'k', '-', 'r', 's'],
-            ]
-        );
+        assert_eq!(res.0.path, ['*']);
+        assert_eq!(res.1.unwrap(), [("user_id", "fundon"), ("id", "trek-rs"),]);
 
         let route = router.find("/users/fundon/repos/trek-rs/router");
         // println!("/users/fundon/repos/trek-rs/router {:#?}", route);
@@ -499,11 +539,7 @@ mod tests {
         assert_eq!(res.0.path, ['*']);
         assert_eq!(
             res.1.unwrap(),
-            vec![
-                vec!['f', 'u', 'n', 'd', 'o', 'n'],
-                vec!['t', 'r', 'e', 'k', '-', 'r', 's'],
-                vec!['r', 'o', 'u', 't', 'e', 'r']
-            ]
+            [("user_id", "fundon"), ("id", "trek-rs"), ("any", "router"),]
         );
 
         let route = router.find("/users/fundon/repos/trek-rs/router/issues");
@@ -512,23 +548,585 @@ mod tests {
         assert_eq!(res.0.path, ['*']);
         assert_eq!(
             res.1.unwrap(),
-            vec![
-                vec!['f', 'u', 'n', 'd', 'o', 'n'],
-                vec!['t', 'r', 'e', 'k', '-', 'r', 's'],
-                vec!['r', 'o', 'u', 't', 'e', 'r', '/', 'i', 's', 's', 'u', 'e', 's']
+            [
+                ("user_id", "fundon"),
+                ("id", "trek-rs"),
+                ("any", "router/issues"),
             ]
         );
 
         let route = router.find("/users/repos/");
         // println!("/users/repos/ {:#?}", route);
         let res = route.unwrap();
-        assert_eq!(res.0.path, "repos/".chars().collect::<Vec<char>>());
-        assert_eq!(res.1.is_some(), false);
+        assert_eq!(res.0.path, "*".chars().collect::<Vec<char>>());
+        assert_eq!(res.1.is_none(), true);
 
         let route = router.find("/about/as");
         // println!("/about/as {:#?}", route);
         let res = route.unwrap();
         assert_eq!(res.0.path, ['*']);
-        assert_eq!(res.1.unwrap(), [['a', 'b', 'o', 'u', 't', '/', 'a', 's']]);
+        assert_eq!(res.1.unwrap(), [("any", "about/as")]);
+    }
+
+    #[test]
+    fn statics() {
+        let mut router = Router::new(
+            "/",
+            NodeMetadata {
+                kind: NodeKind::Root,
+                ..Default::default()
+            },
+        );
+        let routes = [
+            "/hi",
+            "/contact",
+            "/co",
+            "/c",
+            "/a",
+            "/ab",
+            "/doc/",
+            "/doc/go_faq.html",
+            "/doc/go1.html",
+            "/α",
+            "/β",
+        ];
+        for route in &routes {
+            router.insert(route, NodeMetadata::new());
+        }
+
+        // println!("{:#?}", router);
+
+        let route = router.find("/a");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        let node = &res.0;
+        assert_eq!(node.path, ['a']);
+
+        let route = router.find("/");
+        // println!("/ {:#?}", route);
+        assert!(route.is_none());
+
+        let route = router.find("/hi");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        let node = &res.0;
+        assert_eq!(node.path, ['h', 'i']);
+
+        let route = router.find("/contact");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        let node = &res.0;
+        assert_eq!(node.path, "ntact".chars().collect::<Vec<char>>());
+
+        let route = router.find("/co");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        let node = &res.0;
+        assert_eq!(node.path, "o".chars().collect::<Vec<char>>());
+
+        let route = router.find("/con");
+        // println!("/ {:#?}", route);
+        assert!(route.is_none());
+
+        let route = router.find("/cona");
+        // println!("/ {:#?}", route);
+        assert!(route.is_none());
+
+        let route = router.find("/no");
+        // println!("/ {:#?}", route);
+        assert!(route.is_none());
+
+        let route = router.find("/ab");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        let node = &res.0;
+        assert_eq!(node.path, ['b']);
+
+        let route = router.find("/α");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        let node = &res.0;
+        assert_eq!(node.path, ['α']);
+
+        let route = router.find("/β");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        let node = &res.0;
+        assert_eq!(node.path, ['β']);
+    }
+
+    #[test]
+    fn wildcards() {
+        let mut router = Router::new(
+            "/",
+            NodeMetadata {
+                kind: NodeKind::Root,
+                ..Default::default()
+            },
+        );
+        let routes = [
+            "/",
+            "/cmd/:tool/:sub",
+            "/cmd/:tool/",
+            "/cmd/vet",
+            "/src/*filepath",
+            "/src1/",
+            "/src1/*filepath",
+            "/src2*filepath",
+            "/search/",
+            "/search/:query",
+            "/search/invalid",
+            "/user_:name",
+            "/user_:name/about",
+            "/user_x",
+            "/files/:dir/*filepath",
+            "/doc/",
+            "/doc/rust_faq.html",
+            "/doc/rust1.html",
+            "/info/:user/public",
+            "/info/:user/project/:project",
+        ];
+        for route in &routes {
+            router.insert(route, NodeMetadata::new());
+        }
+
+        println!("{:#?}", router);
+
+        let route = router.find("/");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+
+        let route = router.find("/cmd/test/");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        let node = &res.0;
+        assert_eq!(node.path, ['/']);
+        assert_eq!(res.1.unwrap(), [("tool", "test")]);
+
+        let route = router.find("/cmd/test");
+        // println!("/ {:#?}", route);
+        assert!(route.is_none());
+
+        let route = router.find("/cmd/test/3");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        let node = &res.0;
+        assert_eq!(node.path, [':']);
+        assert_eq!(res.1.unwrap(), [("tool", "test"), ("sub", "3")]);
+
+        let route = router.find("/src/");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        let node = &res.0;
+        assert_eq!(node.path, ['*']);
+        assert_eq!(res.1, None);
+
+        let route = router.find("/src/some/file.png");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        let node = &res.0;
+        assert_eq!(node.path, ['*']);
+        assert_eq!(res.1.unwrap(), [("filepath", "some/file.png")]);
+
+        let route = router.find("/search/");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+
+        let route = router.find("/search/someth!ng+in+ünìcodé");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        let node = &res.0;
+        assert_eq!(node.path, [':']);
+        assert_eq!(res.1.unwrap(), [("query", "someth!ng+in+ünìcodé")]);
+
+        let route = router.find("/search/someth!ng+in+ünìcodé/");
+        // println!("/ {:#?}", route);
+        assert!(route.is_none());
+
+        let route = router.find("/user_rust");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        let node = &res.0;
+        assert_eq!(node.path, [':']);
+        assert_eq!(res.1.unwrap(), [("name", "rust")]);
+
+        let route = router.find("/user_rust/about");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        let node = &res.0;
+        assert_eq!(node.path, "/about".chars().collect::<Vec<char>>());
+        assert_eq!(res.1.unwrap(), [("name", "rust")]);
+
+        let route = router.find("/files/js/inc/framework.js");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        let node = &res.0;
+        assert_eq!(node.path, ['*']);
+        assert_eq!(
+            res.1.unwrap(),
+            [("dir", "js"), ("filepath", "inc/framework.js")]
+        );
+
+        let route = router.find("/info/gordon/public");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        let node = &res.0;
+        assert_eq!(node.path, "ublic".chars().collect::<Vec<char>>());
+        assert_eq!(res.1.unwrap(), [("user", "gordon")]);
+
+        let route = router.find("/info/gordon/project/rust");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        let node = &res.0;
+        assert_eq!(node.path, [':']);
+        assert_eq!(res.1.unwrap(), [("user", "gordon"), ("project", "rust")]);
+    }
+
+    #[test]
+    fn single_named_parameter() {
+        //  Pattern: /users/:id
+        //
+        //      /users/gordon              match
+        //      /users/you                 match
+        //      /users/gordon/profile      no match
+        //      /users/                    no match
+        let mut router = Router::new(
+            "/",
+            NodeMetadata {
+                kind: NodeKind::Root,
+                ..Default::default()
+            },
+        );
+
+        router.insert("/users/:id", NodeMetadata::new());
+
+        // println!("{:#?}", router);
+
+        let route = router.find("/users/");
+        // println!("/ {:#?}", route);
+        assert!(route.is_none());
+
+        let route = router.find("/users/gordon/profile");
+        // println!("/ {:#?}", route);
+        assert!(route.is_none());
+
+        let route = router.find("/users/gordon");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        let node = &res.0;
+        assert_eq!(node.path, [':']);
+        if let Some(data) = &node.data {
+            assert_eq!(data.is_key, true);
+        }
+        assert_eq!(res.1.unwrap(), [("id", "gordon")]);
+
+        let route = router.find("/users/you");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        let node = &res.0;
+        assert_eq!(node.path, [':']);
+        if let Some(data) = &node.data {
+            assert_eq!(data.is_key, true);
+        }
+        assert_eq!(res.1.unwrap(), [("id", "you")]);
+    }
+
+    #[test]
+    fn static_and_named_parameter() {
+        //  Pattern: /a/b/c
+        //  Pattern: /a/c/d
+        //  Pattern: /a/c/a
+        //  Pattern: /:id/c/e
+        //
+        //      /a/b/c                  match
+        //      /a/c/d                  match
+        //      /a/c/a                  match
+        //      /a/c/e                  match
+        let mut router = Router::new(
+            "/",
+            NodeMetadata {
+                kind: NodeKind::Root,
+                ..Default::default()
+            },
+        );
+
+        router.insert("/a/b/c", NodeMetadata::new());
+        router.insert("/a/c/d", NodeMetadata::new());
+        router.insert("/a/c/a", NodeMetadata::new());
+        router.insert("/:id/c/e", NodeMetadata::new());
+
+        // println!("router {:#?}", router);
+
+        let route = router.find("/");
+        // println!("/ {:#?}", route);
+        assert!(route.is_none());
+
+        let route = router.find("/a/b/c");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        assert_eq!(res.0.path, ['b', '/', 'c']);
+        assert_eq!(res.1, None);
+
+        let route = router.find("/a/c/d");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        assert_eq!(res.0.path, ['d']);
+        assert_eq!(res.1, None);
+
+        let route = router.find("/a/c/a");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        assert_eq!(res.0.path, ['a']);
+        assert_eq!(res.1, None);
+
+        let route = router.find("/a/c/e");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        assert_eq!(res.0.path, ['/', 'c', '/', 'e']);
+        assert_eq!(res.1.unwrap(), [("id", "a")]);
+    }
+
+    #[test]
+    fn multi_named_parameters() {
+        //  Pattern: /:lang/:keyword
+        //  Pattern: /:id
+        //
+        //      /rust                     match
+        //      /rust/let                 match
+        //      /rust/let/const           no match
+        //      /rust/let/                no match
+        //      /rust/                    no match
+        //      /                         no match
+        let mut router = Router::new(
+            "/",
+            NodeMetadata {
+                kind: NodeKind::Root,
+                ..Default::default()
+            },
+        );
+
+        router.insert("/:lang/:keyword", NodeMetadata::new());
+        router.insert("/:id", NodeMetadata::new());
+        // router.insert("/:id/:post_id", NodeMetadata::new());
+
+        // println!("router {:#?}", router);
+
+        let route = router.find("/");
+        // println!("/ {:#?}", route);
+        assert!(route.is_none());
+
+        let route = router.find("/rust/");
+        // println!("/ {:#?}", route);
+        assert!(route.is_none());
+
+        let route = router.find("/rust/let/");
+        // println!("/ {:#?}", route);
+        assert!(route.is_none());
+
+        let route = router.find("/rust/let/const");
+        // println!("/ {:#?}", route);
+        assert!(route.is_none());
+
+        let route = router.find("/rust/let");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        assert_eq!(res.0.path, [':']);
+        assert_eq!(res.1.unwrap(), [("lang", "rust"), ("keyword", "let")]);
+
+        let route = router.find("/rust");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        assert_eq!(res.0.path, [':']);
+        assert_eq!(res.1.unwrap(), [("id", "rust")]);
+    }
+
+    #[test]
+    fn catch_all_parameter() {
+        //  Pattern: /src/*filepath
+        //
+        //      /src                      no match
+        //      /src/                     match
+        //      /src/somefile.go          match
+        //      /src/subdir/somefile.go   match
+        let mut router = Router::new(
+            "/",
+            NodeMetadata {
+                kind: NodeKind::Root,
+                ..Default::default()
+            },
+        );
+
+        router.insert("/src/*filepath", NodeMetadata::new());
+
+        let route = router.find("/src");
+        // println!("/ {:#?}", route);
+        assert!(route.is_none());
+
+        let route = router.find("/src/");
+        // println!("/src/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        assert_eq!(res.0.path, ['*']);
+        assert!(res.1.is_none());
+
+        let route = router.find("/src/somefile.rs");
+        // println!("/src/somefile.rs {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        assert_eq!(res.0.path, ['*']);
+        assert_eq!(res.1.unwrap(), [("filepath", "somefile.rs")]);
+
+        let route = router.find("/src/subdir/somefile.rs");
+        // println!("/src/subdir/somefile.rs {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        assert_eq!(res.0.path, ['*']);
+        assert_eq!(res.1.unwrap(), [("filepath", "subdir/somefile.rs")]);
+
+        let route = router.find("/src.rs");
+        // println!("/src.rs {:#?}", route);
+        assert!(route.is_none());
+
+        let route = router.find("/rust");
+        // println!("/rust {:#?}", route);
+        assert!(route.is_none());
+
+        // split node, 'src/' is key node
+        router.insert("/src/", NodeMetadata::new());
+
+        let route = router.find("/src/");
+        // println!("/src/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        assert_eq!(res.0.path, "src/".chars().collect::<Vec<char>>());
+        assert!(res.1.is_none());
+    }
+
+    #[test]
+    fn static_and_catch_all_parameter() {
+        //  Pattern: /a/b/c
+        //  Pattern: /a/c/d
+        //  Pattern: /a/c/a
+        //  Pattern: /a/*c
+        //
+        //      /a/b/c                  match
+        //      /a/c/d                  match
+        //      /a/c/a                  match
+        //      /a/c/e                  match
+        let mut router = Router::new(
+            "/",
+            NodeMetadata {
+                kind: NodeKind::Root,
+                ..Default::default()
+            },
+        );
+
+        router.insert("/a/b/c", NodeMetadata::new());
+        router.insert("/a/c/d", NodeMetadata::new());
+        router.insert("/a/c/a", NodeMetadata::new());
+        router.insert("/a/*c", NodeMetadata::new());
+
+        // println!("router {:#?}", router);
+
+        let route = router.find("/");
+        // println!("/ {:#?}", route);
+        assert!(route.is_none());
+
+        let route = router.find("/a/b/c");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        assert_eq!(res.0.path, ['b', '/', 'c']);
+        assert_eq!(res.1, None);
+
+        let route = router.find("/a/c/d");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        assert_eq!(res.0.path, ['d']);
+        assert_eq!(res.1, None);
+
+        let route = router.find("/a/c/a");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        assert_eq!(res.0.path, ['a']);
+        assert_eq!(res.1, None);
+
+        let route = router.find("/a/c/e");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        assert_eq!(res.0.path, ['*']);
+        assert_eq!(res.1.unwrap(), [("c", "c/e")]);
+    }
+
+    #[test]
+    fn root_catch_all_parameter() {
+        //  Pattern: /
+        //  Pattern: /*
+        //  Pattern: /users/*
+        //
+        //      /                  match *
+        //      /download          match *
+        //      /users/fundon      match users *
+        let mut router = Router::new(
+            "/",
+            NodeMetadata {
+                kind: NodeKind::Root,
+                ..Default::default()
+            },
+        );
+
+        router.insert("/", NodeMetadata::new());
+        router.insert("/*", NodeMetadata::new());
+        router.insert("/users/*", NodeMetadata::new());
+
+        // println!("router {:#?}", router);
+
+        let route = router.find("/");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        assert_eq!(res.0.path, ['/']);
+
+        let route = router.find("/download");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        assert_eq!(res.0.path, ['*']);
+        assert_eq!(res.1.unwrap(), [("", "download")]);
+
+        let route = router.find("/users/fundon");
+        // println!("/ {:#?}", route);
+        assert!(route.is_some());
+        let res = route.unwrap();
+        assert_eq!(res.0.path, ['*']);
+        assert_eq!(res.1.unwrap(), [("", "fundon")]);
     }
 }
