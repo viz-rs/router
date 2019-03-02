@@ -697,7 +697,7 @@ mod tests {
             router.insert(route, NodeMetadata::new());
         }
 
-        println!("{:#?}", router);
+        // println!("{:#?}", router);
 
         let route = router.find("/");
         // println!("/ {:#?}", route);
