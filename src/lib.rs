@@ -33,7 +33,7 @@ where
     }
 
     // sub-group with prefix
-    pub fn group(&mut self, path: &str, build: impl FnOnce(&mut Router<T>)) {
+    pub fn group(&mut self, path: &str, build: impl FnOnce(&mut Router<T>)) -> &mut Self {
         let mut group = Router {
             path: join_paths(&self.path, path),
             middleware: self.middleware.clone(),
@@ -41,6 +41,7 @@ where
         };
         build(&mut group);
         self.trees = group.trees;
+        self
     }
 
     fn _handle(&mut self, method: Method, path: &str, handler: T) -> &mut Self {
@@ -132,23 +133,22 @@ mod tests {
         type F = fn() -> usize;
         let mut router = Router::<F>::new();
 
-        // Simple group: v1
-        router.group("/v1", |v1| {
-            v1.get("/login", || 0);
-            v1.post("/submit", || 1);
-            v1.delete("/read", || 2);
-        });
-
-        // Simple group: v2
-        router.group("/v2", |v2| {
-            v2.get("/login", || 0);
-            v2.post("/submit", || 1);
-            v2.delete("/read", || 2);
-        });
-
-        router.get("/foo", || 3);
-        router.post("/bar", || 4);
-        router.delete("/baz", || 5);
+        router
+            // Simple group: v1
+            .group("/v1", |v1| {
+                v1.get("/login", || 0)
+                    .post("/submit", || 1)
+                    .delete("/read", || 2);
+            })
+            // Simple group: v2
+            .group("/v2", |v2| {
+                v2.get("/login", || 0)
+                    .post("/submit", || 1)
+                    .delete("/read", || 2);
+            })
+            .get("/foo", || 3)
+            .post("/bar", || 4)
+            .delete("/baz", || 5);
 
         dbg!(&router);
     }

@@ -90,6 +90,10 @@ fn v2_read(_req: Request<Body>, _: Params) -> Response<Body> {
     Response::new(Body::from("v2 read"))
 }
 
+fn users(_req: Request<Body>, _: Params) -> Body {
+    Body::from("users")
+}
+
 fn foo(_: Request<Body>, _: Params) -> Response<Body> {
     Response::new(Body::from("foo"))
 }
@@ -107,23 +111,26 @@ fn main() {
 
     let mut router = Router::<Handler>::new();
 
-    // Simple group: v1
-    router.group("/v1", |v1| {
-        v1.get("/login", v1_login);
-        v1.post("/submit", v1_submit);
-        v1.delete("/read", v1_read);
-    });
-
-    // Simple group: v2
-    router.group("/v2", |v2| {
-        v2.get("/login", v2_login);
-        v2.post("/submit", v2_submit);
-        v2.delete("/read", v2_read);
-    });
-
-    router.get("/foo", foo);
-    router.post("/bar", bar);
-    router.delete("/baz", baz);
+    router
+        // Simple group: v1
+        .group("/v1", |v1| {
+            v1.get("/login", v1_login)
+                .post("/submit", v1_submit)
+                .delete("/read", v1_read);
+        })
+        // Simple group: v2
+        .group("/v2", |v2| {
+            v2.get("/login", v2_login)
+                .post("/submit", v2_submit)
+                .delete("/read", v2_read)
+                // Simple group: v2/users
+                .group("users", |u| {
+                    u.any("", users);
+                });
+        })
+        .get("/foo", foo)
+        .post("/bar", bar)
+        .delete("/baz", baz);
 
     let router = Arc::new(router);
 
