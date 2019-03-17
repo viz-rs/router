@@ -5,4 +5,13 @@ authors = ["Fangdun Cai <cfddream@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-radix-tree = "^0.0"
+path-tree = "^0.1"
+http = "^0.1"
+
+[dev-dependencies]
+hyper = "^0.12"
+futures = "^0.1"
+
+[[example]]
+name = "hello"
+path = "examples/hello.rs"

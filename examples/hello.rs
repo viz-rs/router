@@ -1,56 +1,3 @@
-# trek-router
-
-A flexible router for RESTful APIs. Powered by [path-tree].
-
-[![Build Status](https://travis-ci.org/trek-rs/router.svg?branch=master)](https://travis-ci.org/trek-rs/router)
-[![Latest version](https://img.shields.io/crates/v/trek-router.svg)](https://crates.io/crates/trek-router)
-[![Documentation](https://docs.rs/trek-router/badge.svg)](https://docs.rs/trek-router)
-![License](https://img.shields.io/crates/l/trek-router.svg)
-
-## Features
-
-- Supports `get` `post` `delete` `patch` `put` `options` `head` `connect` `trace`.
-
-- Supports `any` for above APIs.
-
-- Supports `group` for scope router.
-
-- Supports `middleware` **WIP**
-
-## Usage
-
-```rust
-extern crate trek_router;
-
-use trek_router::Router;
-
-type F = fn() -> usize;
-let mut router = Router::<F>::new();
-
-// Simple group: v1
-router.group("/v1", |v1| {
-    v1.get("/login", || 0);
-    v1.post("/submit", || 1);
-    v1.delete("/read", || 2);
-});
-
-// Simple group: v2
-router.group("/v2", |v2| {
-    v2.get("/login", || 0);
-    v2.post("/submit", || 1);
-    v2.delete("/read", || 2);
-});
-
-router.get("/foo", || 3);
-router.post("/bar", || 4);
-router.delete("/baz", || 5);
-
-dbg!(&router);
-```
-
-## Examples
-
-```rust
 extern crate futures;
 extern crate hyper;
 extern crate trek_router;
@@ -150,15 +97,3 @@ fn main() {
 
     hyper::rt::run(server);
 }
-```
-
-## License
-
-This project is licensed under either of
-
-- Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or
-  http://www.apache.org/licenses/LICENSE-2.0)
-- MIT license ([LICENSE-MIT](LICENSE-MIT) or
-  http://opensource.org/licenses/MIT)
-
-[path-tree]: https://github.com/trek-rs/path-tree
