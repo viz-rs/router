@@ -1,6 +1,6 @@
 # trek-router
 
-A flexible router for RESTful APIs. Powered by [path-tree].
+Routing
 
 [![Build Status](https://travis-ci.org/trek-rs/router.svg?branch=master)](https://travis-ci.org/trek-rs/router)
 [![Latest version](https://img.shields.io/crates/v/trek-router.svg)](https://crates.io/crates/trek-router)
@@ -13,7 +13,7 @@ A flexible router for RESTful APIs. Powered by [path-tree].
 
 - Supports `any` for above APIs.
 
-- Supports `group` for scope router.
+- Supports `scope` for scope routes.
 
 - Supports `middleware` **WIP**
 
@@ -27,15 +27,15 @@ use trek_router::Router;
 type F = fn() -> usize;
 let mut router = Router::<F>::new();
 
-// Simple group: v1
-router.group("/v1", |v1| {
+// scope v1
+router.scope("/v1", |v1| {
     v1.get("/login", || 0);
     v1.post("/submit", || 1);
     v1.delete("/read", || 2);
 });
 
-// Simple group: v2
-router.group("/v2", |v2| {
+// scope v2
+router.scope("/v2", |v2| {
     v2.get("/login", || 0);
     v2.post("/submit", || 1);
     v2.delete("/read", || 2);
@@ -64,46 +64,46 @@ use trek_router::Router;
 
 type Params<'a> = Vec<(&'a str, &'a str)>;
 
-type Handler = fn(Request<Body>, Params) -> Response<Body>;
+type Handler = fn(Request<Body>, Params) -> Body;
 
-fn v1_login(_: Request<Body>, _: Params) -> Response<Body> {
-    Response::new(Body::from("v1 login"))
+fn v1_login(_: Request<Body>, _: Params) -> Body {
+    Body::from("v1 login")
 }
 
-fn v1_submit(_req: Request<Body>, _: Params) -> Response<Body> {
-    Response::new(Body::from("v1 submit"))
+fn v1_submit(_req: Request<Body>, _: Params) -> Body {
+    Body::from("v1 submit")
 }
 
-fn v1_read(_req: Request<Body>, _: Params) -> Response<Body> {
-    Response::new(Body::from("v1 read"))
+fn v1_read(_req: Request<Body>, _: Params) -> Body {
+    Body::from("v1 read")
 }
 
-fn v2_login(_: Request<Body>, _: Params) -> Response<Body> {
-    Response::new(Body::from("v2 login"))
+fn v2_login(_: Request<Body>, _: Params) -> Body {
+    Body::from("v2 login")
 }
 
-fn v2_submit(_req: Request<Body>, _: Params) -> Response<Body> {
-    Response::new(Body::from("v2 submit"))
+fn v2_submit(_req: Request<Body>, _: Params) -> Body {
+    Body::from("v2 submit")
 }
 
-fn v2_read(_req: Request<Body>, _: Params) -> Response<Body> {
-    Response::new(Body::from("v2 read"))
+fn v2_read(_req: Request<Body>, _: Params) -> Body {
+    Body::from("v2 read")
 }
 
 fn users(_req: Request<Body>, _: Params) -> Body {
     Body::from("users")
 }
 
-fn foo(_: Request<Body>, _: Params) -> Response<Body> {
-    Response::new(Body::from("foo"))
+fn foo(_: Request<Body>, _: Params) -> Body {
+    Body::from("foo")
 }
 
-fn bar(_req: Request<Body>, _: Params) -> Response<Body> {
-    Response::new(Body::from("bar"))
+fn bar(_req: Request<Body>, _: Params) -> Body {
+    Body::from("bar")
 }
 
-fn baz(_req: Request<Body>, _: Params) -> Response<Body> {
-    Response::new(Body::from("baz"))
+fn baz(_req: Request<Body>, _: Params) -> Body {
+    Body::from("baz")
 }
 
 fn main() {
@@ -112,19 +112,19 @@ fn main() {
     let mut router = Router::<Handler>::new();
 
     router
-        // Simple group: v1
-        .group("/v1", |v1| {
+        // scope v1
+        .scope("/v1", |v1| {
             v1.get("/login", v1_login)
                 .post("/submit", v1_submit)
                 .delete("/read", v1_read);
         })
-        // Simple group: v2
-        .group("/v2", |v2| {
+        // scope v2
+        .scope("/v2", |v2| {
             v2.get("/login", v2_login)
                 .post("/submit", v2_submit)
                 .delete("/read", v2_read)
-                // Simple group: v2/users
-                .group("users", |u| {
+                // scope users
+                .scope("users", |u| {
                     u.any("", users);
                 });
         })
@@ -142,7 +142,7 @@ fn main() {
             let path = req.uri().path().to_owned();
 
             match router.find(&method, &path) {
-                Some((handler, params)) => handler(req, params),
+                Some((handler, params)) => Response::new(handler(req, params)),
                 None => Response::builder()
                     .status(StatusCode::NOT_FOUND)
                     .body(Body::from("Not Found"))

@@ -59,19 +59,19 @@ fn main() {
     let mut router = Router::<Handler>::new();
 
     router
-        // Simple group: v1
-        .group("/v1", |v1| {
+        // scope v1
+        .scope("/v1", |v1| {
             v1.get("/login", v1_login)
                 .post("/submit", v1_submit)
                 .delete("/read", v1_read);
         })
-        // Simple group: v2
-        .group("/v2", |v2| {
+        // scope v2
+        .scope("/v2", |v2| {
             v2.get("/login", v2_login)
                 .post("/submit", v2_submit)
                 .delete("/read", v2_read)
-                // Simple group: v2/users
-                .group("users", |u| {
+                // scope users
+                .scope("users", |u| {
                     u.any("", users);
                 });
         })

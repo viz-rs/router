@@ -5,46 +5,52 @@ use http::Method;
 use path_tree::PathTree;
 use std::collections::HashMap;
 
-pub type Trees<T> = HashMap<Method, PathTree<T>>;
+pub type Trees<H> = HashMap<Method, PathTree<H>>;
 
-#[derive(Debug)]
-pub struct Router<T> {
+#[derive(Clone, Debug)]
+pub struct Router<H> {
     path: String,
-    middleware: Vec<T>,
-    trees: Trees<T>,
+    trees: Trees<H>,
+    middleware: Vec<H>,
 }
 
-impl<T> Router<T>
+impl<H> Router<H>
 where
-    T: Clone,
+    H: Clone,
 {
     pub fn new() -> Self {
         Router {
+            trees: Trees::new(),
             path: "/".to_owned(),
             middleware: Vec::new(),
-            trees: Trees::new(),
         }
     }
 
     // middleware
-    pub fn middleware(&mut self, handler: T) -> &mut Self {
+    pub fn middleware(&mut self, handler: H) -> &mut Self {
         self.middleware.push(handler);
         self
     }
 
-    // sub-group with prefix
-    pub fn group(&mut self, path: &str, build: impl FnOnce(&mut Router<T>)) -> &mut Self {
+    // scope with prefix
+    pub fn scope(&mut self, path: &str, builder: impl FnOnce(&mut Router<H>)) -> &mut Self {
         let mut group = Router {
+            trees: self.trees.clone(),
             path: join_paths(&self.path, path),
             middleware: self.middleware.clone(),
-            trees: self.trees.clone(),
         };
-        build(&mut group);
+        builder(&mut group);
         self.trees = group.trees;
+
+        // let parent_path = self.path.to_owned();
+        // self.path = join_paths(&self.path, path);
+        // build(self);
+        // self.path = parent_path;
+
         self
     }
 
-    fn _handle(&mut self, method: Method, path: &str, handler: T) -> &mut Self {
+    fn _handle(&mut self, method: Method, path: &str, handler: H) -> &mut Self {
         // TODO: combine middleware + handler to finally handler
         self.trees
             .entry(method)
@@ -53,47 +59,47 @@ where
         self
     }
 
-    pub fn handle(&mut self, method: Method, path: &str, handler: T) -> &mut Self {
+    pub fn handle(&mut self, method: Method, path: &str, handler: H) -> &mut Self {
         self._handle(method, &join_paths(&self.path, path), handler)
     }
 
-    pub fn get(&mut self, path: &str, handler: T) -> &mut Self {
+    pub fn get(&mut self, path: &str, handler: H) -> &mut Self {
         self.handle(Method::GET, path, handler)
     }
 
-    pub fn post(&mut self, path: &str, handler: T) -> &mut Self {
+    pub fn post(&mut self, path: &str, handler: H) -> &mut Self {
         self.handle(Method::POST, path, handler)
     }
 
-    pub fn delete(&mut self, path: &str, handler: T) -> &mut Self {
+    pub fn delete(&mut self, path: &str, handler: H) -> &mut Self {
         self.handle(Method::DELETE, path, handler)
     }
 
-    pub fn patch(&mut self, path: &str, handler: T) -> &mut Self {
+    pub fn patch(&mut self, path: &str, handler: H) -> &mut Self {
         self.handle(Method::PATCH, path, handler)
     }
 
-    pub fn put(&mut self, path: &str, handler: T) -> &mut Self {
+    pub fn put(&mut self, path: &str, handler: H) -> &mut Self {
         self.handle(Method::PUT, path, handler)
     }
 
-    pub fn options(&mut self, path: &str, handler: T) -> &mut Self {
+    pub fn options(&mut self, path: &str, handler: H) -> &mut Self {
         self.handle(Method::OPTIONS, path, handler)
     }
 
-    pub fn head(&mut self, path: &str, handler: T) -> &mut Self {
+    pub fn head(&mut self, path: &str, handler: H) -> &mut Self {
         self.handle(Method::HEAD, path, handler)
     }
 
-    pub fn connect(&mut self, path: &str, handler: T) -> &mut Self {
+    pub fn connect(&mut self, path: &str, handler: H) -> &mut Self {
         self.handle(Method::CONNECT, path, handler)
     }
 
-    pub fn trace(&mut self, path: &str, handler: T) -> &mut Self {
+    pub fn trace(&mut self, path: &str, handler: H) -> &mut Self {
         self.handle(Method::TRACE, path, handler)
     }
 
-    pub fn any(&mut self, path: &str, handler: T) -> &mut Self {
+    pub fn any(&mut self, path: &str, handler: H) -> &mut Self {
         let path = &join_paths(&self.path, path);
         self._handle(Method::GET, path, handler.clone());
         self._handle(Method::POST, path, handler.clone());
@@ -106,11 +112,15 @@ where
         self._handle(Method::TRACE, path, handler.clone())
     }
 
+    pub fn resources(&mut self, path: &str) -> &mut Self {
+        self
+    }
+
     pub fn find<'a>(
         &'a self,
         method: &'a Method,
         path: &'a str,
-    ) -> Option<(&'a T, Vec<(&'a str, &'a str)>)> {
+    ) -> Option<(&'a H, Vec<(&'a str, &'a str)>)> {
         let tree = self.trees.get(method)?;
         tree.find(path)
     }
@@ -134,14 +144,14 @@ mod tests {
         let mut router = Router::<F>::new();
 
         router
-            // Simple group: v1
-            .group("/v1", |v1| {
+            // scope v1
+            .scope("/v1", |v1| {
                 v1.get("/login", || 0)
                     .post("/submit", || 1)
                     .delete("/read", || 2);
             })
-            // Simple group: v2
-            .group("/v2", |v2| {
+            // scope v2
+            .scope("/v2", |v2| {
                 v2.get("/login", || 0)
                     .post("/submit", || 1)
                     .delete("/read", || 2);
