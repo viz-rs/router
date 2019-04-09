@@ -101,15 +101,15 @@ where
 
     pub fn any(&mut self, path: &str, handler: H) -> &mut Self {
         let path = &join_paths(&self.path, path);
-        self._handle(Method::GET, path, handler.clone());
-        self._handle(Method::POST, path, handler.clone());
-        self._handle(Method::DELETE, path, handler.clone());
-        self._handle(Method::PATCH, path, handler.clone());
-        self._handle(Method::PUT, path, handler.clone());
-        self._handle(Method::OPTIONS, path, handler.clone());
-        self._handle(Method::HEAD, path, handler.clone());
-        self._handle(Method::CONNECT, path, handler.clone());
-        self._handle(Method::TRACE, path, handler.clone())
+        self._handle(Method::GET, path, handler.clone())
+            ._handle(Method::POST, path, handler.clone())
+            ._handle(Method::DELETE, path, handler.clone())
+            ._handle(Method::PATCH, path, handler.clone())
+            ._handle(Method::PUT, path, handler.clone())
+            ._handle(Method::OPTIONS, path, handler.clone())
+            ._handle(Method::HEAD, path, handler.clone())
+            ._handle(Method::CONNECT, path, handler.clone())
+            ._handle(Method::TRACE, path, handler.clone())
     }
 
     pub fn resources(&mut self, path: &str) -> &mut Self {
@@ -158,8 +158,51 @@ mod tests {
             })
             .get("/foo", || 3)
             .post("/bar", || 4)
-            .delete("/baz", || 5);
+            .delete("/baz", || 5)
+            // scope admin
+            .scope("admin", |a| {
+                a.any("/", || 6);
+            });
 
-        dbg!(&router);
+        // dbg!(&router);
+
+        let r = router.find(&Method::DELETE, "/v1/read");
+        assert!(r.is_some());
+        let (h, p) = r.unwrap();
+        assert_eq!(h(), 2);
+        assert_eq!(p, []);
+
+        let r = router.find(&Method::POST, "/v2/submit");
+        assert!(r.is_some());
+        let (h, p) = r.unwrap();
+        assert_eq!(h(), 1);
+        assert_eq!(p, []);
+
+        let r = router.find(&Method::GET, "/foo");
+        assert!(r.is_some());
+        let (h, p) = r.unwrap();
+        assert_eq!(h(), 3);
+        assert_eq!(p, []);
+
+        let r = router.find(&Method::POST, "/bar");
+        assert!(r.is_some());
+        let (h, p) = r.unwrap();
+        assert_eq!(h(), 4);
+        assert_eq!(p, []);
+
+        let r = router.find(&Method::DELETE, "/baz");
+        assert!(r.is_some());
+        let (h, p) = r.unwrap();
+        assert_eq!(h(), 5);
+        assert_eq!(p, []);
+
+        let r = router.find(&Method::HEAD, "/admin/");
+        assert!(r.is_some());
+        let (h, p) = r.unwrap();
+        assert_eq!(h(), 6);
+        assert_eq!(p, []);
+
+        let r = router.find(&Method::OPTIONS, "/admin");
+        assert!(r.is_none());
     }
 }
