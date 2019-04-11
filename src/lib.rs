@@ -54,7 +54,7 @@ where
         // TODO: combine middleware + handler to finally handler
         self.trees
             .entry(method)
-            .or_insert_with(|| PathTree::new())
+            .or_insert_with(PathTree::new)
             .insert(path, handler);
         self
     }
