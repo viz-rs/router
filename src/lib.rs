@@ -1,5 +1,10 @@
+#[macro_use]
+extern crate lazy_static;
 extern crate http;
+extern crate inflector;
 extern crate path_tree;
+
+mod resource;
 
 use http::Method;
 use path_tree::PathTree;
@@ -112,7 +117,27 @@ where
             ._handle(Method::TRACE, path, handler.clone())
     }
 
-    pub fn resources(&mut self, path: &str) -> &mut Self {
+    pub fn resource(&mut self, path: &str, resource: Vec<((&str, &str, &Method), H)>) -> &mut Self {
+        let path = &join_paths(&self.path, path);
+        for (r, m) in resource.iter() {
+            let new_path = &join_paths(&path, r.1);
+            dbg!(r.0);
+            self._handle(dbg!(r.2.to_owned()), dbg!(new_path), m.clone());
+        }
+        self
+    }
+
+    pub fn resources(
+        &mut self,
+        path: &str,
+        resources: Vec<((&str, &str, &Method), H)>,
+    ) -> &mut Self {
+        let path = &join_paths(&self.path, path);
+        for (r, m) in resources.iter() {
+            let new_path = &join_paths(&path, r.1);
+            dbg!(r.0);
+            self._handle(dbg!(r.2.to_owned()), dbg!(new_path), m.clone());
+        }
         self
     }
 
@@ -162,9 +187,16 @@ mod tests {
             // scope admin
             .scope("admin", |a| {
                 a.any("/", || 6);
+                // a.resources(
+                //     "users",
+                //     Resource {
+                //         index: || 7,
+                //         new: || 8,
+                //     },
+                // );
             });
 
-        // dbg!(&router);
+        dbg!(&router);
 
         let r = router.find(&Method::DELETE, "/v1/read");
         assert!(r.is_some());
@@ -204,5 +236,17 @@ mod tests {
 
         let r = router.find(&Method::OPTIONS, "/admin");
         assert!(r.is_none());
+
+        // let r = router.find(&Method::GET, "/admin/users");
+        // assert!(r.is_some());
+        // let (h, p) = r.unwrap();
+        // assert_eq!(h(), 7);
+        // assert_eq!(p, []);
+
+        // let r = router.find(&Method::GET, "/admin/users/new");
+        // assert!(r.is_some());
+        // let (h, p) = r.unwrap();
+        // assert_eq!(h(), 8);
+        // assert_eq!(p, []);
     }
 }
