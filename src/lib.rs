@@ -12,6 +12,8 @@ use inflector::string::singularize::to_singular;
 use path_tree::PathTree;
 use std::collections::HashMap;
 
+pub use resource::{Resource, ResourceOptions, Resources};
+
 pub type Trees<H> = HashMap<Method, PathTree<H>>;
 
 #[derive(Clone, Debug)]
