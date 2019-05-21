@@ -201,38 +201,38 @@ mod tests {
             type Body = usize;
 
             fn index(ctx: Self::Context) -> Self::Body {
-                println!("{}", "Resource Index");
+                println!("{}", "Resources Index");
                 0
             }
 
             fn create(ctx: Self::Context) -> Self::Body {
-                println!("{}", "Resource Create");
+                println!("{}", "Resources Create");
                 1
             }
 
             fn new(ctx: Self::Context) -> Self::Body {
-                println!("{}", "Resource New");
-                5
-            }
-
-            fn show(ctx: Self::Context) -> Self::Body {
-                println!("{}", "Resource Show");
-                0
-            }
-
-            fn update(ctx: Self::Context) -> Self::Body {
-                println!("{}", "Resource Update");
+                println!("{}", "Resources New");
                 2
             }
 
-            fn delete(ctx: Self::Context) -> Self::Body {
-                println!("{}", "Resource Delete");
+            fn show(ctx: Self::Context) -> Self::Body {
+                println!("{}", "Resources Show");
                 3
             }
 
-            fn edit(ctx: Self::Context) -> Self::Body {
-                println!("{}", "Resource Edit");
+            fn update(ctx: Self::Context) -> Self::Body {
+                println!("{}", "Resources Update");
                 4
+            }
+
+            fn delete(ctx: Self::Context) -> Self::Body {
+                println!("{}", "Resources Delete");
+                5
+            }
+
+            fn edit(ctx: Self::Context) -> Self::Body {
+                println!("{}", "Resources Edit");
+                6
             }
         }
 
@@ -281,5 +281,53 @@ mod tests {
         let (h, p) = r.unwrap();
         assert_eq!(h(()), 5);
         assert_eq!(p, []);
+
+        let r = router.find(&Method::GET, "/users");
+        assert!(r.is_some());
+        let (h, p) = r.unwrap();
+        assert_eq!(h(()), 0);
+        assert_eq!(p, []);
+
+        let r = router.find(&Method::POST, "/users");
+        assert!(r.is_some());
+        let (h, p) = r.unwrap();
+        assert_eq!(h(()), 1);
+        assert_eq!(p, []);
+
+        let r = router.find(&Method::GET, "/users/new");
+        assert!(r.is_some());
+        let (h, p) = r.unwrap();
+        assert_eq!(h(()), 2);
+        assert_eq!(p, []);
+
+        let r = router.find(&Method::GET, "/users/1");
+        assert!(r.is_some());
+        let (h, p) = r.unwrap();
+        assert_eq!(h(()), 3);
+        assert_eq!(p, [("user_id", "1")]);
+
+        let r = router.find(&Method::PATCH, "/users/1");
+        assert!(r.is_some());
+        let (h, p) = r.unwrap();
+        assert_eq!(h(()), 4);
+        assert_eq!(p, [("user_id", "1")]);
+
+        let r = router.find(&Method::PUT, "/users/1");
+        assert!(r.is_some());
+        let (h, p) = r.unwrap();
+        assert_eq!(h(()), 4);
+        assert_eq!(p, [("user_id", "1")]);
+
+        let r = router.find(&Method::DELETE, "/users/1");
+        assert!(r.is_some());
+        let (h, p) = r.unwrap();
+        assert_eq!(h(()), 5);
+        assert_eq!(p, [("user_id", "1")]);
+
+        let r = router.find(&Method::GET, "/users/1/edit");
+        assert!(r.is_some());
+        let (h, p) = r.unwrap();
+        assert_eq!(h(()), 6);
+        assert_eq!(p, [("user_id", "1")]);
     }
 }

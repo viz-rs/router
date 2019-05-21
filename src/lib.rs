@@ -123,8 +123,7 @@ where
         let path = &join_paths(&self.path, &to_singular(path));
         for (r, m) in resource.iter() {
             let new_path = &join_paths(&path, r.1);
-            dbg!(r.0);
-            self._handle(dbg!(r.2.to_owned()), dbg!(new_path), m.clone());
+            self._handle(r.2.to_owned(), new_path, m.clone());
         }
         self
     }
@@ -137,8 +136,7 @@ where
         let path = &join_paths(&self.path, &to_plural(path));
         for (r, m) in resources.iter() {
             let new_path = &join_paths(&path, &r.1.replace("id", &(to_singular(path) + "_id")));
-            dbg!(r.0);
-            self._handle(dbg!(r.2.to_owned()), dbg!(new_path), m.clone());
+            self._handle(r.2.to_owned(), new_path, m.clone());
         }
         self
     }
