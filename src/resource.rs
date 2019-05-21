@@ -65,13 +65,10 @@ pub trait Resource {
         let ResourceOptions { only, except } = opts;
         let mut ra: Vec<_> = RESOURCE_ACTIONS.to_vec();
         if !only.is_empty() {
-            ra = ra.into_iter().take_while(|t| only.contains(&t.0)).collect();
+            ra.retain(|t| !only.contains(&t.0));
         }
         if !except.is_empty() {
-            ra = ra
-                .into_iter()
-                .skip_while(|t| except.contains(&t.0))
-                .collect();
+            ra.retain(|t| except.contains(&t.0));
         }
         let mut r: Vec<(
             (&'a str, &'a str, &'a Method),
@@ -113,13 +110,10 @@ pub trait Resources {
         let ResourceOptions { only, except } = opts;
         let mut ra: Vec<_> = RESOURCES_ACTIONS.to_vec();
         if !only.is_empty() {
-            ra = ra.into_iter().take_while(|t| only.contains(&t.0)).collect();
+            ra.retain(|t| !only.contains(&t.0));
         }
         if !except.is_empty() {
-            ra = ra
-                .into_iter()
-                .skip_while(|t| except.contains(&t.0))
-                .collect();
+            ra.retain(|t| except.contains(&t.0));
         }
         let mut r: Vec<(
             (&'a str, &'a str, &'a Method),
