@@ -7,6 +7,8 @@ extern crate path_tree;
 mod resource;
 
 use http::Method;
+use inflector::string::pluralize::to_plural;
+use inflector::string::singularize::to_singular;
 use path_tree::PathTree;
 use std::collections::HashMap;
 
@@ -118,7 +120,7 @@ where
     }
 
     pub fn resource(&mut self, path: &str, resource: Vec<((&str, &str, &Method), H)>) -> &mut Self {
-        let path = &join_paths(&self.path, path);
+        let path = &join_paths(&self.path, &to_singular(path));
         for (r, m) in resource.iter() {
             let new_path = &join_paths(&path, r.1);
             dbg!(r.0);
@@ -132,9 +134,9 @@ where
         path: &str,
         resources: Vec<((&str, &str, &Method), H)>,
     ) -> &mut Self {
-        let path = &join_paths(&self.path, path);
+        let path = &join_paths(&self.path, &to_plural(path));
         for (r, m) in resources.iter() {
-            let new_path = &join_paths(&path, r.1);
+            let new_path = &join_paths(&path, &r.1.replace("id", &(to_singular(path) + "_id")));
             dbg!(r.0);
             self._handle(dbg!(r.2.to_owned()), dbg!(new_path), m.clone());
         }
