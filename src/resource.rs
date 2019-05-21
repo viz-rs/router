@@ -62,17 +62,15 @@ pub trait Resource {
         (&'a str, &'a str, &'a Method),
         fn(Self::Context) -> Self::Body,
     )> {
+        let ResourceOptions { only, except } = opts;
         let mut ra: Vec<_> = RESOURCE_ACTIONS.to_vec();
-        if !opts.only.is_empty() {
-            ra = ra
-                .into_iter()
-                .take_while(|t| opts.only.contains(&t.0))
-                .collect();
+        if !only.is_empty() {
+            ra = ra.into_iter().take_while(|t| only.contains(&t.0)).collect();
         }
-        if !opts.except.is_empty() {
+        if !except.is_empty() {
             ra = ra
                 .into_iter()
-                .skip_while(|t| opts.except.contains(&t.0))
+                .skip_while(|t| except.contains(&t.0))
                 .collect();
         }
         let mut r: Vec<(
@@ -112,17 +110,15 @@ pub trait Resources {
         (&'a str, &'a str, &'a Method),
         fn(Self::Context) -> Self::Body,
     )> {
+        let ResourceOptions { only, except } = opts;
         let mut ra: Vec<_> = RESOURCES_ACTIONS.to_vec();
-        if !opts.only.is_empty() {
-            ra = ra
-                .into_iter()
-                .take_while(|t| opts.only.contains(&t.0))
-                .collect();
+        if !only.is_empty() {
+            ra = ra.into_iter().take_while(|t| only.contains(&t.0)).collect();
         }
-        if !opts.except.is_empty() {
+        if !except.is_empty() {
             ra = ra
                 .into_iter()
-                .skip_while(|t| opts.except.contains(&t.0))
+                .skip_while(|t| except.contains(&t.0))
                 .collect();
         }
         let mut r: Vec<(
@@ -152,43 +148,46 @@ mod tests {
 
     #[test]
     fn resource() {
-        type F = fn(ctx: ()) -> usize;
+        struct Context {
+            count: usize,
+        }
+        type F = fn(Context) -> usize;
         let mut router = Router::<F>::new();
 
         struct Geocoder {}
 
         impl Resource for Geocoder {
-            type Context = ();
+            type Context = Context;
             type Body = usize;
 
             fn show(ctx: Self::Context) -> Self::Body {
                 println!("{}", "Resource Show");
-                0
+                ctx.count + 0
             }
 
             fn create(ctx: Self::Context) -> Self::Body {
                 println!("{}", "Resource Create");
-                1
+                ctx.count + 1
             }
 
             fn update(ctx: Self::Context) -> Self::Body {
                 println!("{}", "Resource Update");
-                2
+                ctx.count + 2
             }
 
             fn delete(ctx: Self::Context) -> Self::Body {
                 println!("{}", "Resource Delete");
-                3
+                ctx.count + 3
             }
 
             fn edit(ctx: Self::Context) -> Self::Body {
                 println!("{}", "Resource Edit");
-                4
+                ctx.count + 4
             }
 
             fn new(ctx: Self::Context) -> Self::Body {
                 println!("{}", "Resource New");
-                5
+                ctx.count + 5
             }
         }
 
@@ -197,42 +196,42 @@ mod tests {
         struct Users {}
 
         impl Resources for Users {
-            type Context = ();
+            type Context = Context;
             type Body = usize;
 
             fn index(ctx: Self::Context) -> Self::Body {
                 println!("{}", "Resources Index");
-                0
+                ctx.count + 0
             }
 
             fn create(ctx: Self::Context) -> Self::Body {
                 println!("{}", "Resources Create");
-                1
+                ctx.count + 1
             }
 
             fn new(ctx: Self::Context) -> Self::Body {
                 println!("{}", "Resources New");
-                2
+                ctx.count + 2
             }
 
             fn show(ctx: Self::Context) -> Self::Body {
                 println!("{}", "Resources Show");
-                3
+                ctx.count + 3
             }
 
             fn update(ctx: Self::Context) -> Self::Body {
                 println!("{}", "Resources Update");
-                4
+                ctx.count + 4
             }
 
             fn delete(ctx: Self::Context) -> Self::Body {
                 println!("{}", "Resources Delete");
-                5
+                ctx.count + 5
             }
 
             fn edit(ctx: Self::Context) -> Self::Body {
                 println!("{}", "Resources Edit");
-                6
+                ctx.count + 6
             }
         }
 
@@ -240,94 +239,109 @@ mod tests {
 
         dbg!(&router);
 
+        let ctx = Context { count: 0 };
         let r = router.find(&Method::GET, "/geocoder");
         assert!(r.is_some());
         let (h, p) = r.unwrap();
-        assert_eq!(h(()), 0);
+        assert_eq!(h(ctx), 0);
         assert_eq!(p, []);
 
+        let ctx = Context { count: 0 };
         let r = router.find(&Method::POST, "/geocoder");
         assert!(r.is_some());
         let (h, p) = r.unwrap();
-        assert_eq!(h(()), 1);
+        assert_eq!(h(ctx), 1);
         assert_eq!(p, []);
 
+        let ctx = Context { count: 0 };
         let r = router.find(&Method::PATCH, "/geocoder");
         assert!(r.is_some());
         let (h, p) = r.unwrap();
-        assert_eq!(h(()), 2);
+        assert_eq!(h(ctx), 2);
         assert_eq!(p, []);
 
+        let ctx = Context { count: 0 };
         let r = router.find(&Method::PUT, "/geocoder");
         assert!(r.is_some());
         let (h, p) = r.unwrap();
-        assert_eq!(h(()), 2);
+        assert_eq!(h(ctx), 2);
         assert_eq!(p, []);
 
+        let ctx = Context { count: 0 };
         let r = router.find(&Method::DELETE, "/geocoder");
         assert!(r.is_some());
         let (h, p) = r.unwrap();
-        assert_eq!(h(()), 3);
+        assert_eq!(h(ctx), 3);
         assert_eq!(p, []);
 
+        let ctx = Context { count: 0 };
         let r = router.find(&Method::GET, "/geocoder/edit");
         assert!(r.is_some());
         let (h, p) = r.unwrap();
-        assert_eq!(h(()), 4);
+        assert_eq!(h(ctx), 4);
         assert_eq!(p, []);
 
+        let ctx = Context { count: 0 };
         let r = router.find(&Method::GET, "/geocoder/new");
         assert!(r.is_some());
         let (h, p) = r.unwrap();
-        assert_eq!(h(()), 5);
+        assert_eq!(h((ctx)), 5);
         assert_eq!(p, []);
 
+        let ctx = Context { count: 0 };
         let r = router.find(&Method::GET, "/users");
         assert!(r.is_some());
         let (h, p) = r.unwrap();
-        assert_eq!(h(()), 0);
+        assert_eq!(h((ctx)), 0);
         assert_eq!(p, []);
 
+        let ctx = Context { count: 0 };
         let r = router.find(&Method::POST, "/users");
         assert!(r.is_some());
         let (h, p) = r.unwrap();
-        assert_eq!(h(()), 1);
+        assert_eq!(h((ctx)), 1);
         assert_eq!(p, []);
 
+        let ctx = Context { count: 0 };
         let r = router.find(&Method::GET, "/users/new");
         assert!(r.is_some());
         let (h, p) = r.unwrap();
-        assert_eq!(h(()), 2);
+        assert_eq!(h((ctx)), 2);
         assert_eq!(p, []);
 
+        let ctx = Context { count: 0 };
         let r = router.find(&Method::GET, "/users/1");
         assert!(r.is_some());
         let (h, p) = r.unwrap();
-        assert_eq!(h(()), 3);
+        assert_eq!(h((ctx)), 3);
         assert_eq!(p, [("user_id", "1")]);
 
+        let ctx = Context { count: 0 };
         let r = router.find(&Method::PATCH, "/users/1");
         assert!(r.is_some());
         let (h, p) = r.unwrap();
-        assert_eq!(h(()), 4);
+        assert_eq!(h((ctx)), 4);
         assert_eq!(p, [("user_id", "1")]);
 
+        let ctx = Context { count: 0 };
         let r = router.find(&Method::PUT, "/users/1");
         assert!(r.is_some());
         let (h, p) = r.unwrap();
-        assert_eq!(h(()), 4);
+        assert_eq!(h((ctx)), 4);
         assert_eq!(p, [("user_id", "1")]);
 
+        let ctx = Context { count: 0 };
         let r = router.find(&Method::DELETE, "/users/1");
         assert!(r.is_some());
         let (h, p) = r.unwrap();
-        assert_eq!(h(()), 5);
+        assert_eq!(h((ctx)), 5);
         assert_eq!(p, [("user_id", "1")]);
 
+        let ctx = Context { count: 0 };
         let r = router.find(&Method::GET, "/users/1/edit");
         assert!(r.is_some());
         let (h, p) = r.unwrap();
-        assert_eq!(h(()), 6);
+        assert_eq!(h((ctx)), 6);
         assert_eq!(p, [("user_id", "1")]);
     }
 }

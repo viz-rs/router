@@ -108,22 +108,22 @@ where
 
     pub fn any(&mut self, path: &str, handler: H) -> &mut Self {
         let path = &join_paths(&self.path, path);
-        self._handle(Method::GET, path, handler.clone())
-            ._handle(Method::POST, path, handler.clone())
-            ._handle(Method::DELETE, path, handler.clone())
-            ._handle(Method::PATCH, path, handler.clone())
-            ._handle(Method::PUT, path, handler.clone())
-            ._handle(Method::OPTIONS, path, handler.clone())
-            ._handle(Method::HEAD, path, handler.clone())
-            ._handle(Method::CONNECT, path, handler.clone())
-            ._handle(Method::TRACE, path, handler.clone())
+        self._handle(Method::GET, path, handler.to_owned())
+            ._handle(Method::POST, path, handler.to_owned())
+            ._handle(Method::DELETE, path, handler.to_owned())
+            ._handle(Method::PATCH, path, handler.to_owned())
+            ._handle(Method::PUT, path, handler.to_owned())
+            ._handle(Method::OPTIONS, path, handler.to_owned())
+            ._handle(Method::HEAD, path, handler.to_owned())
+            ._handle(Method::CONNECT, path, handler.to_owned())
+            ._handle(Method::TRACE, path, handler.to_owned())
     }
 
     pub fn resource(&mut self, path: &str, resource: Vec<((&str, &str, &Method), H)>) -> &mut Self {
         let path = &join_paths(&self.path, &to_singular(path));
         for (r, m) in resource.iter() {
             let new_path = &join_paths(&path, r.1);
-            self._handle(r.2.to_owned(), new_path, m.clone());
+            self._handle(r.2.to_owned(), new_path, m.to_owned());
         }
         self
     }
@@ -136,7 +136,7 @@ where
         let path = &join_paths(&self.path, &to_plural(path));
         for (r, m) in resources.iter() {
             let new_path = &join_paths(&path, &r.1.replace("id", &(to_singular(path) + "_id")));
-            self._handle(r.2.to_owned(), new_path, m.clone());
+            self._handle(r.2.to_owned(), new_path, m.to_owned());
         }
         self
     }
