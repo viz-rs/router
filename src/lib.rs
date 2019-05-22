@@ -28,7 +28,7 @@ where
     H: Clone,
 {
     pub fn new() -> Self {
-        Router {
+        Self {
             trees: Trees::new(),
             path: "/".to_owned(),
             middleware: Vec::new(),
@@ -189,13 +189,6 @@ mod tests {
             // scope admin
             .scope("admin", |a| {
                 a.any("/", || 6);
-                // a.resources(
-                //     "users",
-                //     Resource {
-                //         index: || 7,
-                //         new: || 8,
-                //     },
-                // );
             });
 
         dbg!(&router);
@@ -238,17 +231,5 @@ mod tests {
 
         let r = router.find(&Method::OPTIONS, "/admin");
         assert!(r.is_none());
-
-        // let r = router.find(&Method::GET, "/admin/users");
-        // assert!(r.is_some());
-        // let (h, p) = r.unwrap();
-        // assert_eq!(h(), 7);
-        // assert_eq!(p, []);
-
-        // let r = router.find(&Method::GET, "/admin/users/new");
-        // assert!(r.is_some());
-        // let (h, p) = r.unwrap();
-        // assert_eq!(h(), 8);
-        // assert_eq!(p, []);
     }
 }
