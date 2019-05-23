@@ -1,7 +1,6 @@
 use http::Method;
 
 lazy_static! {
-    #[derive(Debug)]
     pub static ref RESOURCE_ACTIONS: &'static [(&'static str, &'static str, &'static Method)] = &[
         ("show", "", &Method::GET),
         ("create", "", &Method::POST),
@@ -31,14 +30,14 @@ pub struct ResourceOptions {
 
 impl ResourceOptions {
     pub fn only(only: Vec<&'static str>) -> Self {
-        ResourceOptions {
+        Self {
             only,
             except: vec![],
         }
     }
 
     pub fn except(except: Vec<&'static str>) -> Self {
-        ResourceOptions {
+        Self {
             only: vec![],
             except,
         }
